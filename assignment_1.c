@@ -2,49 +2,47 @@
 #include <avr/interrupt.h>
 volatile uint8_t state;
 
+/*
+Your program should loop, reading the voltage at pin A0 at a rate of 1 Sa/s. Use an external
+reference voltage of 5 V (applied at pin AREF), and use the full 10-bit resolution of the ADC. Set
+the ADC’s prescale factor to 128.
+
+Here is a suggested hardware set-up: Connect the 5 V pin on the Arduino Uno to two resistors
+in series, and in turn connect this series resistance to the Arduino Uno’s ground pin. Start
+simple: use two 1 kOhm resistors. Connect the node between the two resistors to pin A0 of the
+Arduino Uno’s ADC. You’ve built a simple voltage divider; in theory, what’s the voltage
+appearing at pin A0? It's half of the voltage of the 5 V pin, i.e 2.5V.
+
+Program the Arduino Uno’s on-board LED to verify that your program works to spec. If the
+sampled voltage at pin A0 is >= 2 V, then on each 1-second cycle of your program blink the LED
+twice; if the sampled voltage is < 2 V, then blink the LED once. In software, change this
+threshold value (2 V) to convince yourself that your program works
+*/
+
 int main(void){
-// Set in/out
-DDRB |= (1<<DDB1)|(1<<DDB2)|(1<<DDB3); // Set pins 9, 10, 11 to write
-DDRD &= ~(1<<DDD2); // Set pin 3 to read
 
+    // Set in/out
+    DDRC |= (1 << DDC0) // Set pin A0 to output
 
-state = 1; // Default on
+    threshold = 2; // Voltage threshold to 
 
-EICRA |= (1 << ISC00) | (1 << ISC01);  // INT0 will trigger on a rising edge
-EIMSK |= (1 << INT0);                  // INT0 enabled
+    while(1){
+        // If pin A0 is greater than threshold, blink LED twice in a second. Otherwise, blink LED once in a second.
+        if ((PINC && (1 << DDC0)) > threshold){
+            for (int i = 0; i < 2; i++){
+                digitalWrite(LED, HIGH);
+                _delay_ms(100);
+                digitalWrite(LED, LOW);
+                _delay_ms(100);
+            }
 
-sei(); // All interupts enabled
+            _delay_ms(600);
 
-// Defaults
-
-PORTB |= (1<<DDB1)|(1<<DDB2)|(1<<DDB3); // Default all LEDs to be on
-
-while(1){
-    if(state == 1){
-        // Blink the LEDs if the state is 1
-        PORTB |= (1<<PB3);
-        PORTB &= ~(1<<PB1);
-        _delay_ms(500);
-        PORTB &= ~(1<<PB3);
-        PORTB |= (1<<PB1);
-        _delay_ms(500);
-    } else {
-        for (int i = 0; i < 4; i++) {
-        
-        PORTB |= (1<<PB3);
-        PORTB &= ~(1<<PB1);
-        _delay_ms(125);
-        PORTB &= ~(1<<PB3);
-        PORTB |= (1<<PB1);
-        _delay_ms(125);
-        
+        } else {
+            digitalWrite(LED, HIGH);
+            _delay_ms(100);
+            digitalWrite(LED, LOW);
+            _delay_ms(900);
         }
     }
-}
-}
-
-
-ISR(INT0_vect){
-state = ~state;
-Serial.print("state switch");
 }
