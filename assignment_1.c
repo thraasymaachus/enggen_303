@@ -1,6 +1,6 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
-#define THRESHOLD 102
+#define THRESHOLD 410
 
 /*
 Your program should loop, reading the voltage at pin A0 at a rate of 1 Sa/s. Use an external
@@ -22,7 +22,11 @@ threshold value (2 V) to convince yourself that your program works
 int main(void){
 
     // Set in/out
-    DDRC |= (1 << DDC0) // Set pin A0 to output
+    DDRB |= (1 << PB5); // Set onboard LED to output
+    DDRC &= ~(1 << DDC0); // Set pin A0 to input
+
+    // Initializing
+    uint16_t A0Read;
 
     // Note: We don't need to configure MUX3..0 as this defaults to 0000, i.e ADC0
     // ADMUX |= (1 << REFS0);   // Don't adjust voltage reference for now, as we want our 5V external input as the reference (register default)
@@ -33,29 +37,29 @@ int main(void){
     ADCSRA |= (1 << ADEN);  // Start the ADC
     ADCSRA |= (1 << ADPS0)|(1 << ADPS1)|(1 << ADPS2); // Set the LSBs in ADCSRA to 111, which corresponds to a division factor of 128. This should give us 200Sa/s
 
+    Serial.begin(9600);
+
     while(1){
         ADCSRA |= (1 << ADSC);  // Begin single conversion
 
-        A0Read = (ADCL + (ADCH << 8));  // Our entire ADC value is contained within the ADCH register
+        A0Read = (ADCL | (ADCH << 8));  // Our entire ADC value is contained within the ADCH register
 
-        Serial.print("%i", &A0Read);
+        Serial.println(A0Read);
 
         // If pin A0 is greater than threshold, blink LED twice in a second. Otherwise, blink LED once in a second.
-        if (A0Read > THRESHOLD){  // A0Read is (Vin * 2^8)/(Vref). We'll set the threshold to 2V (102 in DEC) at first, and move it up to check our expectations that behaviour changes at 2.5V.
+        if (A0Read > THRESHOLD){  // A0Read is (Vin * 2^10)/(Vref). We'll set the threshold to 2V (410 in DEC) at first, and move it up to check our expectations that behaviour changes at 2.5V.
             for (int i = 0; i < 2; i++){
-                digitalWrite(LED, HIGH);
-                _delay_ms(100);
-                digitalWrite(LED, LOW);
-                _delay_ms(100);
+                PORTB |= (1 << PORTB5);
+                _delay_ms(250);
+                PORTB &= ~(1 << PORTB5);
+                _delay_ms(250);
             }
 
-            _delay_ms(600);
-
         } else {
-            digitalWrite(LED, HIGH);
-            _delay_ms(100);
-            digitalWrite(LED, LOW);
-            _delay_ms(900);
+            PORTB |= (1 << PORTB5);
+            _delay_ms(500);
+            PORTB &= ~(1 << PORTB5);
+            _delay_ms(500);
         }
     }
 }
