@@ -1,5 +1,6 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#define THRESHOLD 102
 
 /*
 Your program should loop, reading the voltage at pin A0 at a rate of 1 Sa/s. Use an external
@@ -23,21 +24,24 @@ int main(void){
     // Set in/out
     DDRC |= (1 << DDC0) // Set pin A0 to output
 
-    threshold = 2; // Voltage threshold to 
-
     // Note: We don't need to configure MUX3..0 as this defaults to 0000, i.e ADC0
-    ADMUX |= (1 << REFS0);   //  Reference voltage becomes our internal voltage of 1.1V, rather than whatever analog reference is being fed in.
-    ADMUX |= (1 << MUX0);    // 
-    ADMUX |= (1 << ADLAR);   // We'll read in 8 bits of ADC, rather than 10 bits.
+    // ADMUX |= (1 << REFS0);   // Don't adjust voltage reference for now, as we want our 5V external input as the reference (register default)
+    // ADMUX |= (1 << MUX0);    // Don't adjust MUX3...0, as the default is correct
+    // ADMUX |= (1 << ADLAR);  // We want to read in the full 10 bits, so don't adjust the ADLAR bit for now
 
-    // Note: We can execute this as a single instruction, to reduce the number of clock cycles. Same for the above.
-    ADCSRA |= (1 << ADEN);    // Start the ADC
-    ADCSRA |= (1 << ADPS1);   //with next line…
-    ADCSRA |= (1 << ADPS0);   //set division factor-8 for 125kHz ADC clock
+    // Note: We can execute this as a single instruction, ato reduce the number of clock cycles. Same for the above.
+    ADCSRA |= (1 << ADEN);  // Start the ADC
+    ADCSRA |= (1 << ADPS0)|(1 << ADPS1)|(1 << ADPS2); // Set the LSBs in ADCSRA to 111, which corresponds to a division factor of 128. This should give us 200Sa/s
 
     while(1){
+        ADCSRA |= (1 << ADSC);  // Begin single conversion
+
+        A0Read = (ADCL + (ADCH << 8));  // Our entire ADC value is contained within the ADCH register
+
+        Serial.print("%i", &A0Read);
+
         // If pin A0 is greater than threshold, blink LED twice in a second. Otherwise, blink LED once in a second.
-        if ((PINC && (1 << DDC0)) > threshold){  // ADC = (Vin * 2^10)/(Vref)
+        if (A0Read > THRESHOLD){  // A0Read is (Vin * 2^8)/(Vref). We'll set the threshold to 2V (102 in DEC) at first, and move it up to check our expectations that behaviour changes at 2.5V.
             for (int i = 0; i < 2; i++){
                 digitalWrite(LED, HIGH);
                 _delay_ms(100);
