@@ -31,6 +31,7 @@ ISR(INT0_vect)
 {
   if (state == S0)
   {
+    printfrom = start;
     state = S1;
   }
   else
@@ -53,7 +54,6 @@ int main()
 
   // Button setting
   //  Set pin as input
-  PORTD |= (1 << DDD2);
   DDRD &= ~(1 << DDD2);
   // Enable external interrupt on rising edge of INT0
   EICRA |= (1 << ISC00) | (1 << ISC01);
@@ -100,7 +100,15 @@ int main()
       }
       break;
     case S1:
-      send_data();
+      switch (readnow)
+      {
+      case S0:
+        break;
+      case S1:
+        send_data();
+        readnow = S0;
+        break;
+      }
       break;
     }
   }
@@ -163,10 +171,10 @@ void ADCstart()
 
 void send_data()
 {
-  printfrom = start;
-  for (int i = 0; i < numofvalue; i++)
-  {
+
+  if(numofvalue!=0){
     Serial.println(database[printfrom]);
-    printfrom = (printfrom + 1) % SIZE_OF_BUFFER; // move to the next element
+    printfrom = (printfrom + 1) % SIZE_OF_BUFFER;
+    numofvalue--;
   }
 }
