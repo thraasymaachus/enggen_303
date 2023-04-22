@@ -15,9 +15,12 @@
 #define S2 2
 int state = S0;
 int readnow = S0;
+int LED = S0;
+int count = 0;
+int compare = 245;
 
 // Declare Ring buffer variables
-#define SIZE_OF_BUFFER 1000
+#define SIZE_OF_BUFFER 5
 volatile int start = -1;
 volatile int end = -1;
 volatile int printfrom = -1;
@@ -32,6 +35,7 @@ ISR(INT0_vect)
   if (state == S0)
   {
     printfrom = start;
+    compare = 122;
     state = S1;
   }
   else
@@ -39,6 +43,7 @@ ISR(INT0_vect)
     start = -1;
     end = -1;
     numofvalue = 0;
+    compare = 245;
     state = S0;
   }
 }
@@ -46,6 +51,20 @@ ISR(INT0_vect)
 ISR(TIMER1_COMPA_vect)
 {
   readnow = S1;
+}
+
+ISR(TIMER0_COMPA_vect)
+{
+  count++;
+  if(count>=compare){
+  
+    if(LED == S0){
+      LED = S1;
+    }else{
+      LED = S0;
+    }
+    count = 0;
+  }
 }
 
 int main()
@@ -60,7 +79,15 @@ int main()
   EIMSK |= (1 << INT0);
 
   // Set timer 0 - for LED
-
+  TCCR0A |= (1 << WGM01);
+  TCCR0B |= (1 << CS01) | (1 << CS00); // prescaler of 64
+  TCNT0 = 0;
+  TCCR0A |= (1 << COM0A0);             // OC1A is toggled on match
+  OCR0A = 255; // set compare match value for 1Hz frequency
+  TIMSK0 |= (1 << OCIE0A);
+  
+  
+  
   // Set timer 1 - for ADC
   TCCR1B |= (1 << WGM12);              // CTC Mode
   TCCR1B |= (1 << CS11) | (1 << CS10); // Set prescalar to 64
@@ -69,7 +96,8 @@ int main()
   OCR1A = 1250;                        // Set compare value Correspond to 200Hz count
   TIMSK1 |= (1 << OCIE1A);             // Enable CTC interrupt for OCR1A
 
-  // Set timer 2 - for printing
+  // Set on-board LED to output
+  DDRB |= (1 << DDB5);
 
   // Set ADC
   ADMUX |= (1 << ADLAR);
@@ -110,6 +138,15 @@ int main()
         break;
       }
       break;
+    }
+    switch (LED)
+    {
+      case S0:
+        PORTB |= (1 << PORTB5); // turn the LED on
+        break;
+      case S1:
+        PORTB &= ~(1 << PORTB5); // turn the LED off
+        break;
     }
   }
   return 0;
