@@ -9,15 +9,14 @@
 #include <util/delay.h>
 #include <avr/io.h>
 
-// Declare state variable
+// Declare states variable
 #define S0 0
 #define S1 1
-#define S2 2
-int state = S0;
-int readnow = S0;
-int LED = S0;
+int ButtonState = S0;
+int actnow = S0;
+int LEDstate = S0;
 int count = 0;
-int compare = 245;
+int compare = 490;
 
 // Declare Ring buffer variables
 #define SIZE_OF_BUFFER 5
@@ -26,42 +25,51 @@ volatile int end = -1;
 volatile int printfrom = -1;
 volatile int numofvalue = 0;
 uint8_t volatile database[SIZE_OF_BUFFER] = {0};
-
-// Other variables
 volatile uint8_t val;
 
 ISR(INT0_vect)
 {
-  if (state == S0)
+  if (ButtonState == S0)
   {
-    printfrom = start;
-    compare = 122;
-    state = S1;
+    // Switch to send data
+
+    printfrom = start; // The start of sending
+    compare = 245;     // Adjust LED blinking frequency(quicker)
+    ButtonState = S1;
   }
   else
   {
+    // Switch to record data
+
+    // Reset ring buffer
     start = -1;
     end = -1;
     numofvalue = 0;
-    compare = 245;
-    state = S0;
+
+    compare = 490; // Adjust LED blinking frequency(Slower)
+    ButtonState = S0;
   }
 }
 
 ISR(TIMER1_COMPA_vect)
 {
-  readnow = S1;
+  // Act once when timer is triggered
+  actnow = S1;
 }
 
 ISR(TIMER0_COMPA_vect)
 {
+  // Switch LED on/off at certain frequency
   count++;
-  if(count>=compare){
-  
-    if(LED == S0){
-      LED = S1;
-    }else{
-      LED = S0;
+  if (count >= compare)
+  {
+    if (LEDstate == S0)
+    {
+      LEDstate = S1;
+    }
+    else
+    {
+      LEDstate = S0;
     }
     count = 0;
   }
@@ -72,23 +80,18 @@ int main()
   cli();
 
   // Button setting
-  //  Set pin as input
-  DDRD &= ~(1 << DDD2);
+  DDRD &= ~(1 << DDD2); //  Set pin as input
   // Enable external interrupt on rising edge of INT0
   EICRA |= (1 << ISC00) | (1 << ISC01);
   EIMSK |= (1 << INT0);
 
   // Set timer 0 - for LED
-  TCCR0A |= (1 << WGM01);
   TCCR0B |= (1 << CS01) | (1 << CS00); // prescaler of 64
-  TCNT0 = 0;
-  TCCR0A |= (1 << COM0A0);             // OC1A is toggled on match
-  OCR0A = 255; // set compare match value for 1Hz frequency
-  TIMSK0 |= (1 << OCIE0A);
-  
-  
-  
-  // Set timer 1 - for ADC
+  TCNT0 = 0;                           // Initialise timer to 0
+  TCCR0A |= (1 << COM0A0);             // OC0A is toggled on match
+  TIMSK0 |= (1 << OCIE0A);             // Enable interrupt
+
+  // Set timer 1 - for ADC reocrding and sending
   TCCR1B |= (1 << WGM12);              // CTC Mode
   TCCR1B |= (1 << CS11) | (1 << CS10); // Set prescalar to 64
   TCNT1 = 0;                           // Initialise timer to 0
@@ -100,53 +103,45 @@ int main()
   DDRB |= (1 << DDB5);
 
   // Set ADC
-  ADMUX |= (1 << ADLAR);
+  ADMUX |= (1 << ADLAR);                                // Left adjust ADLAR
   ADCSRA |= (1 << ADEN);                                // ENable ADC
   ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Prescale factor 128
 
   sei();
-
-  // Set on-board LED to output
-  DDRB |= (1 << DDB5);
 
   // initialize serial communication at 9600 bits per second:
   Serial.begin(9600);
 
   while (1)
   {
-    switch (state)
+    // Record or send according to button state and timer state
+    switch (actnow)
     {
     case S0:
-      switch (readnow)
-      {
-      case S0:
-        break;
-      case S1:
-        ADCstart();
-        readnow = S0;
-        break;
-      }
       break;
     case S1:
-      switch (readnow)
+      switch (ButtonState)
       {
       case S0:
+        ADCstart();
         break;
       case S1:
         send_data();
-        readnow = S0;
         break;
       }
+      actnow = S0;
       break;
     }
-    switch (LED)
+
+    // Blink LED
+    switch (LEDstate)
     {
-      case S0:
-        PORTB |= (1 << PORTB5); // turn the LED on
-        break;
-      case S1:
-        PORTB &= ~(1 << PORTB5); // turn the LED off
-        break;
+    case S0:
+      PORTB |= (1 << PORTB5); // turn the LED on
+      break;
+    case S1:
+      PORTB &= ~(1 << PORTB5); // turn the LED off
+      break;
     }
   }
   return 0;
@@ -165,10 +160,12 @@ bool isFull()
 // Add value to array
 void add(uint8_t value)
 {
+  //When there is no element
   if (start == -1)
   {
     start = 0;
   }
+  //When there is more than 1 element
   end = (end + 1) % SIZE_OF_BUFFER;
   database[end] = value;
   numofvalue++;
@@ -177,6 +174,7 @@ void add(uint8_t value)
 // Remove value from array
 void removeFirst()
 {
+  //When there is only 1 element
   if (start == end)
   {
     start = -1;
@@ -209,7 +207,8 @@ void ADCstart()
 void send_data()
 {
 
-  if(numofvalue!=0){
+  if (numofvalue != 0)
+  {
     Serial.println(database[printfrom]);
     printfrom = (printfrom + 1) % SIZE_OF_BUFFER;
     numofvalue--;
