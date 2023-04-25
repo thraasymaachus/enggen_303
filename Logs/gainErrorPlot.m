@@ -21,7 +21,8 @@ for i = 1:n_files
     last_transition_idx = find(data > 249, 1, 'first');
     
     % Calculate gain error
-    gain_error(i) = last_transition_idx - ideal_transition_idx;
+    idx_diff = last_transition_idx - ideal_transition_idx;
+    gain_error(i) = idx_diff * v_ref / 1000;
 end
 
 % Display gain error
@@ -30,11 +31,14 @@ for i = 1:n_files
     fprintf('%d\t\t%.2f\n', prescale(i), gain_error(i));
 end
 
-% Function to make data in phase by starting from zero and wrapping around
+% Function to remove offset error by starting from the last zero and wrapping around
 function data = make_data_in_phase(data)
-    % Find the index of the first zero in the data
-    first_zero_idx = find(data == 0, 1, 'first');
+    % Find the indices of all zeros in the data
+    zero_indices = find(data == 0);
     
-    % Reorder the data to start from zero and wrap around
-    data = [data(first_zero_idx:end); data(1:first_zero_idx-1)];
+    % Find the index of the last zero in the data
+    last_zero_idx = zero_indices(end);
+    
+    % Reorder the data to start from the last zero and wrap around
+    data = [data(last_zero_idx:end); data(1:last_zero_idx-1)];
 end
