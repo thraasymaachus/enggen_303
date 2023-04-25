@@ -28,7 +28,7 @@ end
 % Display gain error
 fprintf('Prescale\tGain Error\n');
 for i = 1:n_files
-    fprintf('%d\t\t%.2f\n', prescale(i), gain_error(i));
+    fprintf('%d\t\t\t%.2fV\n', prescale(i), gain_error(i));
 end
 
 % Function to remove offset error by starting from the last zero and wrapping around

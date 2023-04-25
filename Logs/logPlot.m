@@ -10,12 +10,19 @@ for i = 1:numel(log_files)
     data{i} = make_data_in_phase(data{i});
 end
 
+% Generate the time values for the sawtooth signal
+t = linspace(0, 1000, 1000);
+
+
+sawtooth_signal = 255/2* (1 - sawtooth(2 * pi * t / 1000, 0));
+
 % Plot the data
 figure
 hold on
 for i = 1:numel(log_files)
     plot(data{i}, 'DisplayName', log_files{i})
 end
+plot(sawtooth_signal, 'DisplayName', 'Sawtooth Signal')
 hold off
 xlabel('Index')
 ylabel('Values')
@@ -38,11 +45,13 @@ function data = read_log_file(file_name)
     data = str2double(file_lines);
 end
 
-% Function to make data in phase by starting from zero and wrapping around
 function data = make_data_in_phase(data)
-    % Find the index of the first zero in the data
-    first_zero_idx = find(data == 0, 1, 'first');
+    % Find the indices of all zeros in the data
+    zero_indices = find(data == 0);
     
-    % Reorder the data to start from zero and wrap around
-    data = [data(first_zero_idx:end); data(1:first_zero_idx-1)];
+    % Find the index of the last zero in the data
+    last_zero_idx = zero_indices(end);
+    
+    % Reorder the data to start from the last zero and wrap around
+    data = [data(last_zero_idx:end); data(1:last_zero_idx-1)];
 end
